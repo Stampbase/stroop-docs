@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The specification is the product here, so the only automated gate is
+      # that every internal link resolves.
+      - name: Check relative links resolve
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r -d '' f; do
+            grep -oE ']\(\./[^)#]+' "$f" | sed 's/](\.\///' | while read -r target; do
+              if [ ! -e "$(dirname "$f")/$target" ]; then
+                echo "::error file=$f::broken relative link: $target"
+                fail=1
+              fi
+            done
+          done < <(find . -name '*.md' -not -path './node_modules/*' -print0)
+          exit $fail
