@@ -23,11 +23,15 @@ jobs:
           set -euo pipefail
           fail=0
           while IFS= read -r -d '' f; do
-            grep -oE ']\(\./[^)#]+' "$f" | sed 's/](\.\///' | while read -r target; do
+            # grep exits 1 when a file has no relative links, which is not an error.
+            targets=$(grep -oE '\]\(\./[^)#]+' "$f" | sed 's/](\.\///') || true
+            [ -z "$targets" ] && continue
+            # Here-string keeps the loop in this shell so `fail` survives it.
+            while IFS= read -r target; do
               if [ ! -e "$(dirname "$f")/$target" ]; then
                 echo "::error file=$f::broken relative link: $target"
                 fail=1
               fi
-            done
+            done <<< "$targets"
           done < <(find . -name '*.md' -not -path './node_modules/*' -print0)
           exit $fail
